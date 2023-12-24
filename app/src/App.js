@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
 import deploy from './deploy';
 import Escrow from './Escrow';
+import getContract from './getContract';
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
@@ -26,19 +27,56 @@ function App() {
     getAccounts();
   }, [account]);
 
+  useEffect(() => {
+    async function getEscrows() {
+      const response = await fetch(`${process.env.REACT_APP_REST_API_URL}/escrows`);
+      let escrows = await response.json();
+      escrows = await Promise.all(escrows.map(async escrow => {
+        const escrowContract = await getContract(escrow.address);
+        return {
+          ...escrow,
+          handleApprove: async () => {
+            escrowContract.on('Approved', () => {
+              document.getElementById(escrowContract.address).className =
+                'complete';
+              document.getElementById(escrowContract.address).innerText =
+                "✓ It's been approved!";
+            });
+    
+            await approve(escrowContract, signer);
+          }
+        };
+      }));
+      setEscrows(escrows);
+    }
+
+    getEscrows();
+  }, [signer]);
+
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
     const arbiter = document.getElementById('arbiter').value;
-    const value = ethers.BigNumber.from(document.getElementById('wei').value);
-    const escrowContract = await deploy(signer, arbiter, beneficiary, value);
+    const weiValue = ethers.utils.parseEther(document.getElementById('ether').value);
+    const escrowContract = await deploy(signer, arbiter, beneficiary, weiValue);
 
-
-    const escrow = {
+    let escrow = {
       address: escrowContract.address,
       arbiter,
       beneficiary,
-      value: value.toString(),
-      handleApprove: async () => {
+      value: weiValue.toString(),
+
+    };
+
+    await fetch(`${process.env.REACT_APP_REST_API_URL}/escrows`, {
+      method: "POST", // or 'PUT'
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(escrow),
+    });
+
+    escrow = {
+      ...escrow, handleApprove: async () => {
         escrowContract.on('Approved', () => {
           document.getElementById(escrowContract.address).className =
             'complete';
@@ -68,8 +106,8 @@ function App() {
         </label>
 
         <label>
-          Deposit Amount (in Wei)
-          <input type="text" id="wei" />
+          Deposit Amount (in Ether)
+          <input type="text" id="ether" />
         </label>
 
         <div
@@ -90,7 +128,7 @@ function App() {
 
         <div id="container">
           {escrows.map((escrow) => {
-            return <Escrow key={escrow.address} {...escrow} />;
+            return <Escrow key={escrow.address} signer={signer} {...escrow} />;
           })}
         </div>
       </div>

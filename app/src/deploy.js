@@ -7,5 +7,5 @@ export default async function deploy(signer, arbiter, beneficiary, value) {
     Escrow.bytecode,
     signer
   );
-  return factory.deploy(arbiter, beneficiary, { value });
+  return factory.deploy(arbiter, beneficiary, { value, gasPrice: await signer.getGasPrice() });
 }

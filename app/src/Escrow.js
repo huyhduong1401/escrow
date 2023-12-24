@@ -1,10 +1,29 @@
+import { ethers } from "ethers";
+import { useEffect, useState } from "react";
+import getContract from "./getContract";
+
 export default function Escrow({
   address,
   arbiter,
   beneficiary,
   value,
   handleApprove,
+  signer
 }) {
+  const ethValue = ethers.utils.formatEther(ethers.BigNumber.from(value));
+
+  const [isApproved, setIsApproved] = useState(false);
+
+  useEffect(() => {
+    async function getIsApproved() {
+      const escrowContract = await getContract(address);
+      const isApproved = await escrowContract.connect(signer).isApproved();
+      console.log(isApproved)
+      setIsApproved(isApproved);
+    }
+    getIsApproved();
+  }, [address, signer])
+
   return (
     <div className="existing-contract">
       <ul className="fields">
@@ -18,9 +37,9 @@ export default function Escrow({
         </li>
         <li>
           <div> Value </div>
-          <div> {value} </div>
+          <div> {ethValue} ETH </div>
         </li>
-        <div
+        {!isApproved ? <div
           className="button"
           id={address}
           onClick={(e) => {
@@ -28,9 +47,13 @@ export default function Escrow({
 
             handleApprove();
           }}
-        >
-          Approve
-        </div>
+        > Approve </div> :
+          <div className="complete"
+            id={address}>
+            "✓ It's been approved!";
+          </div>
+        }
+
       </ul>
     </div>
   );
